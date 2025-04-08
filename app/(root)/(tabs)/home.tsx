@@ -1,142 +1,115 @@
-import { useUser } from "@clerk/clerk-expo";
-import { useAuth } from "@clerk/clerk-expo";
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
-  Text,
-  View,
-  TouchableOpacity,
+  Alert,
   Image,
-  FlatList,
-  ActivityIndicator,
+  Platform,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-import GoogleTextInput from "@/components/GoogleTextInput";
 import Map from "@/components/Map";
 import RideCard from "@/components/RideCard";
-import { icons, images } from "@/constants";
-import { useFetch } from "@/lib/fetch";
-import { useLocationStore } from "@/store";
-import { Ride } from "@/types/type";
+import { icons } from "@/constants";
+import { useAuthStore } from "@/lib/auth";
+import { fetchAPI } from "@/lib/auth";
 
 const Home = () => {
-  const { user } = useUser();
-  const { signOut } = useAuth();
+  const { user } = useAuthStore();
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
-  const { setUserLocation, setDestinationLocation } = useLocationStore();
-
-  const handleSignOut = () => {
-    signOut();
-    router.replace("/(auth)/sign-in");
-  };
-
-  const [hasPermission, setHasPermission] = useState<boolean>(false);
-
-  const {
-    data: recentRides,
-    loading,
-    error,
-  } = useFetch<Ride[]>(`/(api)/ride/${user?.id}`);
-
-  useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+  const requestLocationPermission = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        setHasPermission(false);
+        Alert.alert(
+          "Permission Denied",
+          "Please allow location access to use this app",
+        );
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-
-      const address = await Location.reverseGeocodeAsync({
-        latitude: location.coords?.latitude!,
-        longitude: location.coords?.longitude!,
-      });
-
-      setUserLocation({
-        latitude: location.coords?.latitude,
-        longitude: location.coords?.longitude,
-        address: `${address[0].name}, ${address[0].region}`,
-      });
-    })();
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation(currentLocation);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Failed to get location");
+    }
   }, []);
 
-  const handleDestinationPress = (location: {
-    latitude: number;
-    longitude: number;
-    address: string;
-  }) => {
-    setDestinationLocation(location);
-
-    router.push("/(root)/find-ride");
-  };
+  useEffect(() => {
+    requestLocationPermission();
+  }, [requestLocationPermission]);
 
   return (
-    <SafeAreaView className="bg-general-500">
-      <FlatList
-        data={recentRides?.slice(0, 5)}
-        renderItem={({ item }) => <RideCard ride={item} />}
-        keyExtractor={(item, index) => index.toString()}
-        className="px-5"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          paddingBottom: 100,
-        }}
-        ListEmptyComponent={() => (
-          <View className="flex flex-col items-center justify-center">
-            {!loading ? (
-              <>
-                <Image
-                  source={images.noResult}
-                  className="w-40 h-40"
-                  alt="No recent rides found"
-                  resizeMode="contain"
-                />
-                <Text className="text-sm">No recent rides found</Text>
-              </>
-            ) : (
-              <ActivityIndicator size="small" color="#000" />
-            )}
-          </View>
-        )}
-        ListHeaderComponent={
-          <>
-            <View className="flex flex-row items-center justify-between my-5">
-              <Text className="text-2xl font-JakartaExtraBold">
-                Welcome {user?.firstName}👋
-              </Text>
-              <TouchableOpacity
-                onPress={handleSignOut}
-                className="justify-center items-center w-10 h-10 rounded-full bg-white"
-              >
-                <Image source={icons.out} className="w-4 h-4" />
-              </TouchableOpacity>
-            </View>
+    <View className="flex-1 bg-white">
+      <View className="flex-row items-center justify-between p-4">
+        <View>
+          <Text className="text-lg font-JakartaRegular">Welcome back 👋</Text>
+          <Text className="text-2xl font-JakartaBold">{user?.fullName}</Text>
+        </View>
 
-            <GoogleTextInput
-              icon={icons.search}
-              containerStyle="bg-white shadow-md shadow-neutral-300"
-              handlePress={handleDestinationPress}
-            />
-
-            <>
-              <Text className="text-xl font-JakartaBold mt-5 mb-3">
-                Your current location
-              </Text>
-              <View className="flex flex-row items-center bg-transparent h-[300px]">
-                <Map />
-              </View>
-            </>
-
-            <Text className="text-xl font-JakartaBold mt-5 mb-3">
-              Recent Rides
+        {/* Profile button */}
+        <TouchableOpacity onPress={() => router.push("/(root)/(tabs)/profile")}>
+          <View className="w-12 h-12 rounded-full bg-gray-100 justify-center items-center">
+            <Text className="text-xl font-JakartaBold">
+              {user?.fullName?.charAt(0)}
             </Text>
-          </>
-        }
-      />
-    </SafeAreaView>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* Map View */}
+      {location && (
+        <View className="h-[45%] w-full">
+          <Map
+            currentLocation={{
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            }}
+          />
+        </View>
+      )}
+
+      {/* Quick Actions */}
+      <ScrollView className="flex-1 px-4 pt-4">
+        <Text className="text-xl font-JakartaBold mb-4">Quick Actions</Text>
+        <View className="flex-row justify-between">
+          <TouchableOpacity
+            className="flex-1 bg-primary-50 rounded-xl p-4 mr-2"
+            onPress={() => router.push("/book-ride")}
+          >
+            <Image source={icons.map} className="w-8 h-8" />
+            <Text className="text-lg font-JakartaSemiBold mt-2">Book a Ride</Text>
+            <Text className="text-sm text-gray-500">Find nearby drivers</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className="flex-1 bg-primary-50 rounded-xl p-4 ml-2"
+            onPress={() => router.push("/(root)/(tabs)/rides")}
+          >
+            <Image source={icons.list} className="w-8 h-8" />
+            <Text className="text-lg font-JakartaSemiBold mt-2">Your Rides</Text>
+            <Text className="text-sm text-gray-500">View ride history</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Recent Rides */}
+        <View className="mt-6">
+          <Text className="text-xl font-JakartaBold mb-4">Recent Rides</Text>
+          <RideCard
+            pickup="123 Main St"
+            dropoff="456 Market St"
+            date="Today"
+            price={25.99}
+            status="completed"
+          />
+        </View>
+      </ScrollView>
+    </View>
   );
 };
 

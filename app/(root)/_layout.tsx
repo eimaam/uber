@@ -1,24 +1,18 @@
-import { Stack } from "expo-router";
+import { Redirect, Stack, Tabs } from "expo-router";
+import { useAuthStore } from "@/lib/auth";
 
-const Layout = () => {
+export default function RootLayout() {
+  const { isSignedIn } = useAuthStore();
+
+  if (!isSignedIn) {
+    return <Redirect href="/(auth)/welcome" />;
+  }
+
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="find-ride" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="confirm-ride"
-        options={{
-          headerShown: false,
-        }}
-      />
-      <Stack.Screen
-        name="book-ride"
-        options={{
-          headerShown: false,
-        }}
-      />
-    </Stack>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    />
   );
-};
-
-export default Layout;
+}

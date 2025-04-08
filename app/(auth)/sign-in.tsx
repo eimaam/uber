@@ -1,43 +1,40 @@
-import { useSignIn } from "@clerk/clerk-expo";
 import { Link, router } from "expo-router";
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { Alert, Image, ScrollView, Text, View } from "react-native";
 
 import CustomButton from "@/components/CustomButton";
 import InputField from "@/components/InputField";
 import OAuth from "@/components/OAuth";
 import { icons, images } from "@/constants";
+import { useAuthStore } from "@/lib/auth";
+import { axiosInstance } from "@/lib/auth";
 
 const SignIn = () => {
-  const { signIn, setActive, isLoaded } = useSignIn();
-
+  const { setToken, setUser } = useAuthStore();
+  const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
 
-  const onSignInPress = useCallback(async () => {
-    if (!isLoaded) return;
+  const onSignInPress = async () => {
+    if (!form.email || !form.password) {
+      Alert.alert("Error", "Please fill in all fields");
+      return;
+    }
 
     try {
-      const signInAttempt = await signIn.create({
-        identifier: form.email,
-        password: form.password,
-      });
-
-      if (signInAttempt.status === "complete") {
-        await setActive({ session: signInAttempt.createdSessionId });
-        router.replace("/(root)/(tabs)/home");
-      } else {
-        // See https://clerk.com/docs/custom-flows/error-handling for more info on error handling
-        console.log(JSON.stringify(signInAttempt, null, 2));
-        Alert.alert("Error", "Log in failed. Please try again.");
-      }
+      setLoading(true);
+      const { data } = await axiosInstance.post("/(api)/auth/login", form);
+      setToken(data.token);
+      setUser(data.user);
+      router.replace("/(root)/(tabs)/home");
     } catch (err: any) {
-      console.log(JSON.stringify(err, null, 2));
-      Alert.alert("Error", err.errors[0].longMessage);
+      Alert.alert("Error", err.message);
+    } finally {
+      setLoading(false);
     }
-  }, [isLoaded, form]);
+  };
 
   return (
     <ScrollView className="flex-1 bg-white">
@@ -72,10 +69,9 @@ const SignIn = () => {
           <CustomButton
             title="Sign In"
             onPress={onSignInPress}
+            loading={loading}
             className="mt-6"
           />
-
-          <OAuth />
 
           <Link
             href="/sign-up"

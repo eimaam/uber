@@ -1,56 +1,52 @@
-import { useUser } from "@clerk/clerk-expo";
-import { ActivityIndicator, FlatList, Image, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useEffect, useState } from "react";
+import { FlatList, Text, View } from "react-native";
 
 import RideCard from "@/components/RideCard";
-import { images } from "@/constants";
-import { useFetch } from "@/lib/fetch";
-import { Ride } from "@/types/type";
+import { useAuthStore } from "@/lib/auth";
+import { axiosInstance } from "@/lib/auth";
 
 const Rides = () => {
-  const { user } = useUser();
+  const { user } = useAuthStore();
+  const [rides, setRides] = useState([]);
 
-  const {
-    data: recentRides,
-    loading,
-    error,
-  } = useFetch<Ride[]>(`/(api)/ride/${user?.id}`);
+  useEffect(() => {
+    const fetchRides = async () => {
+      try {
+        const response = await axiosInstance.get(`/(api)/ride/${user?.id}`);
+        setRides(response.data);
+      } catch (error) {
+        console.error("Error fetching rides:", error);
+      }
+    };
+
+    if (user?.id) {
+      fetchRides();
+    }
+  }, [user?.id]);
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
+    <View className="flex-1 bg-white p-4">
+      <Text className="text-2xl font-JakartaBold mb-8">Your Rides</Text>
+
       <FlatList
-        data={recentRides}
-        renderItem={({ item }) => <RideCard ride={item} />}
-        keyExtractor={(item, index) => index.toString()}
-        className="px-5"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{
-          paddingBottom: 100,
-        }}
-        ListEmptyComponent={() => (
-          <View className="flex flex-col items-center justify-center">
-            {!loading ? (
-              <>
-                <Image
-                  source={images.noResult}
-                  className="w-40 h-40"
-                  alt="No recent rides found"
-                  resizeMode="contain"
-                />
-                <Text className="text-sm">No recent rides found</Text>
-              </>
-            ) : (
-              <ActivityIndicator size="small" color="#000" />
-            )}
-          </View>
+        data={rides}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <RideCard
+            pickup={item.pickupLocation}
+            dropoff={item.dropoffLocation}
+            date={new Date(item.createdAt).toLocaleDateString()}
+            price={item.price}
+            status={item.status}
+          />
         )}
-        ListHeaderComponent={
-          <>
-            <Text className="text-2xl font-JakartaBold my-5">All Rides</Text>
-          </>
+        ListEmptyComponent={
+          <Text className="text-center text-gray-500 mt-4">
+            No rides found
+          </Text>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

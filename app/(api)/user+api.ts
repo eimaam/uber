@@ -1,30 +1,43 @@
-import { neon } from "@neondatabase/serverless";
+import connectDB from "@/lib/db";
+import User from "@/models/User";
 
 export async function POST(request: Request) {
   try {
-    const sql = neon(`${process.env.DATABASE_URL}`);
-    const { name, email, clerkId } = await request.json();
+    await connectDB();
+    const { fullName, email, phoneNumber, password } = await request.json();
 
-    if (!name || !email || !clerkId) {
+    if (!fullName || !email || !phoneNumber || !password) {
       return Response.json(
         { error: "Missing required fields" },
-        { status: 400 },
+        { status: 400 }
       );
     }
 
-    const response = await sql`
-      INSERT INTO users (
-        name, 
-        email, 
-        clerk_id
-      ) 
-      VALUES (
-        ${name}, 
-        ${email},
-        ${clerkId}
-     );`;
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return Response.json(
+        { error: "User with this email already exists" },
+        { status: 400 }
+      );
+    }
 
-    return new Response(JSON.stringify({ data: response }), {
+    const user = await User.create({
+      fullName,
+      email,
+      phoneNumber,
+      password,
+    });
+
+    // Don't send password in response
+    const userResponse = {
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+    };
+
+    return new Response(JSON.stringify({ data: userResponse }), {
       status: 201,
     });
   } catch (error) {

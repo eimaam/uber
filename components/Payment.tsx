@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/clerk-expo";
 import { useStripe } from "@stripe/stripe-react-native";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -7,7 +6,8 @@ import { ReactNativeModal } from "react-native-modal";
 
 import CustomButton from "@/components/CustomButton";
 import { images } from "@/constants";
-import { fetchAPI } from "@/lib/fetch";
+import { useAuthStore } from "@/lib/auth";
+import { axiosInstance } from "@/lib/auth";
 import { useLocationStore } from "@/store";
 import { PaymentProps } from "@/types/type";
 
@@ -19,6 +19,7 @@ const Payment = ({
   rideTime,
 }: PaymentProps) => {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const { user } = useAuthStore();
   const {
     userAddress,
     userLongitude,
@@ -28,135 +29,93 @@ const Payment = ({
     destinationLongitude,
   } = useLocationStore();
 
-  const { userId } = useAuth();
   const [success, setSuccess] = useState<boolean>(false);
 
   const openPaymentSheet = async () => {
-    await initializePaymentSheet();
+    try {
+      const { paymentIntent, ephemeralKey, customer } = await axiosInstance.post(
+        "/(api)/stripe/create",
+        {
+          amount: amount * 100,
+        }
+      );
 
-    const { error } = await presentPaymentSheet();
+      const { error } = await initPaymentSheet({
+        paymentIntentClientSecret: paymentIntent,
+        customerEphemeralKeySecret: ephemeralKey,
+        customerId: customer,
+        merchantDisplayName: "Uber",
+      });
 
-    if (error) {
-      Alert.alert(`Error code: ${error.code}`, error.message);
-    } else {
+      if (error) {
+        Alert.alert("Error", error.message);
+        return;
+      }
+
+      const { error: presentError } = await presentPaymentSheet();
+
+      if (presentError) {
+        Alert.alert("Error", presentError.message);
+        return;
+      }
+
+      // Create ride
+      await axiosInstance.post("/(api)/ride/create", {
+        userId: user?.id,
+        driverId,
+        pickupLocation: userAddress,
+        dropoffLocation: destinationAddress,
+        pickupCoordinates: {
+          latitude: userLatitude,
+          longitude: userLongitude,
+        },
+        dropoffCoordinates: {
+          latitude: destinationLatitude,
+          longitude: destinationLongitude,
+        },
+        status: "pending",
+        price: amount,
+        estimatedTime: rideTime,
+      });
+
       setSuccess(true);
-    }
-  };
-
-  const initializePaymentSheet = async () => {
-    const { error } = await initPaymentSheet({
-      merchantDisplayName: "Example, Inc.",
-      intentConfiguration: {
-        mode: {
-          amount: parseInt(amount) * 100,
-          currencyCode: "usd",
-        },
-        confirmHandler: async (
-          paymentMethod,
-          shouldSavePaymentMethod,
-          intentCreationCallback,
-        ) => {
-          const { paymentIntent, customer } = await fetchAPI(
-            "/(api)/(stripe)/create",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                name: fullName || email.split("@")[0],
-                email: email,
-                amount: amount,
-                paymentMethodId: paymentMethod.id,
-              }),
-            },
-          );
-
-          if (paymentIntent.client_secret) {
-            const { result } = await fetchAPI("/(api)/(stripe)/pay", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                payment_method_id: paymentMethod.id,
-                payment_intent_id: paymentIntent.id,
-                customer_id: customer,
-                client_secret: paymentIntent.client_secret,
-              }),
-            });
-
-            if (result.client_secret) {
-              await fetchAPI("/(api)/ride/create", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  origin_address: userAddress,
-                  destination_address: destinationAddress,
-                  origin_latitude: userLatitude,
-                  origin_longitude: userLongitude,
-                  destination_latitude: destinationLatitude,
-                  destination_longitude: destinationLongitude,
-                  ride_time: rideTime.toFixed(0),
-                  fare_price: parseInt(amount) * 100,
-                  payment_status: "paid",
-                  driver_id: driverId,
-                  user_id: userId,
-                }),
-              });
-
-              intentCreationCallback({
-                clientSecret: result.client_secret,
-              });
-            }
-          }
-        },
-      },
-      returnURL: "myapp://book-ride",
-    });
-
-    if (!error) {
-      // setLoading(true);
+    } catch (error: any) {
+      Alert.alert("Error", error.message);
     }
   };
 
   return (
-    <>
+    <View>
       <CustomButton
-        title="Confirm Ride"
-        className="my-10"
+        title={`Pay $${amount}`}
         onPress={openPaymentSheet}
+        className="mt-4"
       />
 
       <ReactNativeModal
         isVisible={success}
-        onBackdropPress={() => setSuccess(false)}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
       >
-        <View className="flex flex-col items-center justify-center bg-white p-7 rounded-2xl">
-          <Image source={images.check} className="w-28 h-28 mt-5" />
-
-          <Text className="text-2xl text-center font-JakartaBold mt-5">
-            Booking placed successfully
+        <View className="bg-white p-5 rounded-3xl items-center">
+          <Image source={images.check} className="w-20 h-20" />
+          <Text className="text-xl font-JakartaBold text-center mt-4">
+            Payment Successful
           </Text>
-
-          <Text className="text-md text-general-200 font-JakartaRegular text-center mt-3">
-            Thank you for your booking. Your reservation has been successfully
-            placed. Please proceed with your trip.
+          <Text className="text-general-500 text-center mt-2">
+            Your payment has been processed successfully
           </Text>
-
           <CustomButton
-            title="Back Home"
+            title="View Ride"
             onPress={() => {
               setSuccess(false);
-              router.push("/(root)/(tabs)/home");
+              router.push("/(root)/(tabs)/rides");
             }}
-            className="mt-5"
+            className="mt-4"
           />
         </View>
       </ReactNativeModal>
-    </>
+    </View>
   );
 };
 
