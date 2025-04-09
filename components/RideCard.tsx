@@ -19,28 +19,30 @@ const RideCard = (props: RideCardProps) => {
   const { ride, pickup, dropoff, date, price, status } = props;
 
   // Use Google Maps Static API instead of Geoapify
-  const staticMapUrl = ride ? 
-    `https://maps.googleapis.com/maps/api/staticmap?center=${ride.destination_latitude},${ride.destination_longitude}&zoom=14&size=600x400&scale=2&markers=color:red%7C${ride.destination_latitude},${ride.destination_longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_API_KEY}` :
-    `https://maps.googleapis.com/maps/api/staticmap?center=0,0&zoom=14&size=600x400&scale=2&key=${process.env.EXPO_PUBLIC_GOOGLE_API_KEY}`;
+  const staticMapUrl = ride
+    ? `https://maps.googleapis.com/maps/api/staticmap?center=${ride.destination_latitude},${ride.destination_longitude}&zoom=14&size=600x400&scale=2&markers=color:red%7C${ride.destination_latitude},${ride.destination_longitude}&key=${process.env.EXPO_PUBLIC_GOOGLE_API_KEY}`
+    : `https://maps.googleapis.com/maps/api/staticmap?center=0,0&zoom=14&size=600x400&scale=2&key=${process.env.EXPO_PUBLIC_GOOGLE_API_KEY}`;
 
   // If we have a full ride object, use that, otherwise use the simple props
-  const displayData = ride ? {
-    originAddress: ride.origin_address,
-    destinationAddress: ride.destination_address,
-    date: formatDate(ride.created_at),
-    time: formatTime(ride.ride_time),
-    driverName: `${ride.driver.first_name} ${ride.driver.last_name}`,
-    carSeats: ride.driver.car_seats,
-    paymentStatus: ride.payment_status
-  } : {
-    originAddress: pickup || 'N/A',
-    destinationAddress: dropoff || 'N/A',
-    date: date || 'N/A',
-    time: '',
-    driverName: 'N/A',
-    carSeats: 'N/A',
-    paymentStatus: status || 'N/A'
-  };
+  const displayData = ride
+    ? {
+        originAddress: ride.origin_address,
+        destinationAddress: ride.destination_address,
+        date: formatDate(ride.created_at),
+        time: formatTime(ride.ride_time),
+        driverName: `${ride.driver.first_name} ${ride.driver.last_name}`,
+        carSeats: ride.driver.car_seats,
+        paymentStatus: ride.payment_status,
+      }
+    : {
+        originAddress: pickup || "N/A",
+        destinationAddress: dropoff || "N/A",
+        date: date || "N/A",
+        time: "",
+        driverName: "N/A",
+        carSeats: "N/A",
+        paymentStatus: status || "N/A",
+      };
 
   return (
     <View className="flex flex-row items-center justify-center bg-white rounded-lg shadow-sm shadow-neutral-300 mb-3">
@@ -71,7 +73,8 @@ const RideCard = (props: RideCardProps) => {
               Date & Time
             </Text>
             <Text className="text-md font-JakartaBold" numberOfLines={1}>
-              {displayData.date}{displayData.time ? `, ${displayData.time}` : ''}
+              {displayData.date}
+              {displayData.time ? `, ${displayData.time}` : ""}
             </Text>
           </View>
           {ride && (
@@ -96,13 +99,13 @@ const RideCard = (props: RideCardProps) => {
           )}
           <View className="flex flex-row items-center w-full justify-between">
             <Text className="text-md font-JakartaMedium text-gray-500">
-              {ride ? 'Payment Status' : 'Status'}
+              {ride ? "Payment Status" : "Status"}
             </Text>
             <Text
               className={`text-md capitalize font-JakartaBold ${
-                displayData.paymentStatus.toLowerCase() === "paid" || 
-                displayData.paymentStatus.toLowerCase() === "completed" 
-                  ? "text-green-500" 
+                displayData.paymentStatus.toLowerCase() === "paid" ||
+                displayData.paymentStatus.toLowerCase() === "completed"
+                  ? "text-green-500"
                   : "text-red-500"
               }`}
             >

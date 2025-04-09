@@ -1,48 +1,43 @@
 import { useEffect, useState } from "react";
 import { FlatList, Text, View } from "react-native";
-
 import RideCard from "@/components/RideCard";
 import { useAuthStore } from "@/lib/auth";
 import { axiosInstance } from "@/lib/auth";
+import { Ride } from "@/types/type";
 
 const Rides = () => {
   const { user } = useAuthStore();
-  const [rides, setRides] = useState([]);
+  const [rides, setRides] = useState<Ride[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const fetchRides = async () => {
       try {
-        const response = await axiosInstance.get(`/(api)/ride/${user?.id}`);
-        setRides(response.data);
+        setLoading(true);
+        const { data } = await axiosInstance.get(`/ride/user/${user?._id}`);
+        setRides(data.data || []);
       } catch (error) {
         console.error("Error fetching rides:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    if (user?.id) {
+    if (user?._id) {
       fetchRides();
     }
-  }, [user?.id]);
+  }, [user?._id]);
 
   return (
     <View className="flex-1 bg-white p-4">
       <Text className="text-2xl font-JakartaBold mb-8">Your Rides</Text>
-
       <FlatList
         data={rides}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <RideCard
-            pickup={item.pickupLocation}
-            dropoff={item.dropoffLocation}
-            date={new Date(item.createdAt).toLocaleDateString()}
-            price={item.price}
-            status={item.status}
-          />
-        )}
+        keyExtractor={(item) => item.ride_id.toString()}
+        renderItem={({ item }) => <RideCard ride={item} />}
         ListEmptyComponent={
           <Text className="text-center text-gray-500 mt-4">
-            No rides found
+            {loading ? "Loading rides..." : "No rides found"}
           </Text>
         }
       />

@@ -26,6 +26,10 @@ declare interface MarkerData {
 }
 
 declare interface MapProps {
+  currentLocation?: {
+    latitude: number;
+    longitude: number;
+  };
   destinationLatitude?: number;
   destinationLongitude?: number;
   onDriverTimesCalculated?: (driversWithTimes: MarkerData[]) => void;
